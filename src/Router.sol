@@ -86,6 +86,30 @@ contract Router {
         liquidity = Pair(pair).mint(to);
     }
 
+    /// @notice Remove liquidity from (tokenA, tokenB) and return underlying tokens.
+    /// @dev Transfers LP tokens from caller to the pair, then burns them to release underlying.
+    function removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to,
+        uint256 deadline
+    ) external ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+        (address t0, address t1) = _sortTokens(tokenA, tokenB);
+        address pair = factory.getPair(t0, t1);
+        require(pair != address(0), "Router: no pair");
+
+        require(IERC20(pair).transferFrom(msg.sender, pair, liquidity), "Router: pull LP");
+
+        (uint256 a0, uint256 a1) = Pair(pair).burn(to);
+        (amountA, amountB) = tokenA == t0 ? (a0, a1) : (a1, a0);
+
+        require(amountA >= amountAMin, "Router: insufficient A");
+        require(amountB >= amountBMin, "Router: insufficient B");
+    }
+
     /// @notice Swap an exact amountIn along `path`, requiring at least amountOutMin.
     /// For "USDC -> any coin" use a 2-element path; for coin->coin route via USDC.
     function swapExactTokensForTokens(
